@@ -1,0 +1,10 @@
+2016-02-06T05:00:41+00:00 - MERGED:
+ - twentysixteen-skip-link-focus-fix - http://localhost:8888/wp-content/themes/twentysixteen/js/skip-link-focus-fix.js
+ - twentysixteen-script - http://localhost:8888/wp-content/themes/twentysixteen/js/functions.js
+ - wp-embed - /wp-includes/js/wp-embed.min.js
+2016-02-06T05:01:48+00:00 - COMPRESSING JS WITH CLOSURE
+2016-02-06T05:01:48+00:00 - COMPRESSION FAILED
+array(1) {
+  [0]=>
+  string(44) "No Java runtime present, requesting install."
+}

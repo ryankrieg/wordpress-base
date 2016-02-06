@@ -105,6 +105,7 @@ class JS extends Minify
     public function __construct()
     {
         call_user_func_array(array('parent', '__construct'), func_get_args());
+
         $dataDir = __DIR__.'/jsdata/';
         $options = FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES;
         $this->keywordsReserved = file($dataDir.'keywords_reserved.txt', $options);
@@ -283,10 +284,16 @@ class JS extends Minify
         $content = preg_replace('/(^|[;\}\s])\K('.implode('|', $before).')\s+/', '\\2 ', $content);
         $content = preg_replace('/\s+('.implode('|', $after).')(?=([;\{\s]|$))/', ' \\1', $content);
 
-        // get rid of double semicolons, except where they can be used like:
-        // "for(v=1,_=b;;)" or "for(v=1;;v++)"
-        $content = preg_replace('/;+(?!\))/', ';', $content);
-        $content = preg_replace('/\bfor\(([^;]*);([^;\(]*)\)/', 'for(\\1;;\\2)', $content);
+        /*
+         * Get rid of double semicolons, except where they can be used like:
+         * "for(v=1,_=b;;)", "for(v=1;;v++)" or "for(;;ja||(ja=true))".
+         * I'll safeguard these double semicolons inside for-loops by
+         * temporarily replacing them with an invalid condition: they won't have
+         * a double semicolon and will be easy to spot to restore afterwards.
+         */
+        $content = preg_replace('/\bfor\(([^;]*);;([^;]*)\)/', 'for(\\1;-;\\2)', $content);
+        $content = preg_replace('/;+/', ';', $content);
+        $content = preg_replace('/\bfor\(([^;]*);-;([^;]*)\)/', 'for(\\1;;\\2)', $content);
 
         /*
          * Next, we'll be removing all semicolons where ASI kicks in.
@@ -299,6 +306,16 @@ class JS extends Minify
          * which strips semicolons here & there, we're still left with this one.
          */
         $content = preg_replace('/(for\([^;]*;[^;]*;[^;\{]*\));(\}|$)/s', '\\1;;\\2', $content);
+
+        /*
+         * We also can't strip empty else-statements. Even though they're
+         * useless and probably shouldn't be in the code in the first place, we
+         * shouldn't be stripping the `;` that follows it as it breaks the code.
+         * We can just remove those useless else-statements completely.
+         *
+         * @see https://github.com/matthiasmullie/minify/issues/91
+         */
+        $content = preg_replace('/else;/s', '', $content);
 
         /*
          * We also don't really want to terminate statements followed by closing

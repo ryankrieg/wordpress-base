@@ -3,7 +3,7 @@
  * Plugin Name: Merge + Minify + Refresh
  * Plugin URI: https://wordpress.org/plugins/merge-minify-refresh
  * Description: 
- * Version: 1.5.2
+ * Version: 1.6.2
  * Author: Launch Interactive
  * Author URI: http://launchinteractive.com.au
  * License: GPL2
@@ -25,13 +25,6 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
-
-require_once('Minify/Minify.php');
-require_once('Minify/CSS.php');
-require_once('Minify/Converter.php');
-require_once('Minify/Exception.php');
-require_once('Minify/JS.php');
-
 class MergeMinifyRefresh {
 	
 	private $host = '';
@@ -39,6 +32,11 @@ class MergeMinifyRefresh {
 	
 	private $mergecss = true;
 	private $mergejs = true;
+	private $cssmin = true;
+	private $jsmin = true;
+	private $http2push = false;
+	private $outputbuffering = false;
+	private $ignore = array();
 
   public function __construct() {
     
@@ -56,31 +54,40 @@ class MergeMinifyRefresh {
 	    
 	    add_action( 'wp_ajax_mmr_files', array($this,'mmr_files_callback') );
 		
-		add_action( 'admin_init', array($this,'mmr_register_settings') );
+			add_action( 'admin_init', array($this,'mmr_register_settings') );
+			
+			register_deactivation_hook( __FILE__, array($this, 'plugin_deactivate') );
 	    
 	  } else {
 
-		$this->host = $_SERVER['HTTP_HOST'];
-		//php < 5.4.7 returns null if host without scheme entered
-		if(mb_substr($this->host, 0, 4) !== 'http') $this->host = 'http'.(isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] != 'off' ? 's' : '').'://' . $this->host;
-		$this->host = parse_url( $this->host, PHP_URL_HOST );
+			$this->host = $_SERVER['HTTP_HOST'];
+			//php < 5.4.7 returns null if host without scheme entered
+			if(mb_substr($this->host, 0, 4) !== 'http') $this->host = 'http'.(isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] != 'off' ? 's' : '').'://' . $this->host;
+			$this->host = parse_url( $this->host, PHP_URL_HOST );
+			
+			$this->mergecss = !get_option('mmr-nomergecss');
+			$this->mergejs = !get_option('mmr-nomergejs');
+			$this->cssmin = !get_option('mmr-nocssmin');
+			$this->jsmin = !get_option('mmr-nojsmin');
+			$this->http2push = get_option('mmr-http2push');
+			$this->outputbuffering = get_option('mmr-outputbuffering');
+			$this->ignore = array_map('trim',explode(PHP_EOL,get_option('mmr-ignore')));
 	    
 	    add_action( 'compress_css',array($this,'compress_css_action'), 10, 1 );
-		add_action( 'compress_js', array($this,'compress_js_action'), 10, 1 );
+			add_action( 'compress_js', array($this,'compress_js_action'), 10, 1 );
 	    
+    	if($this->outputbuffering) {
+    		add_action( 'init', array($this,'start_buffer'), PHP_INT_MIN );
+    	}
+    	
     	add_action( 'wp_print_scripts', array($this,'inspect_scripts'), PHP_INT_MAX );
     	add_action( 'wp_print_styles', array($this,'inspect_styles'), PHP_INT_MAX );
     	
     	add_filter( 'style_loader_src', array($this,'remove_cssjs_ver'), 10, 2 );
-		add_filter( 'script_loader_src', array($this,'remove_cssjs_ver'), 10, 2 );
+			add_filter( 'script_loader_src', array($this,'remove_cssjs_ver'), 10, 2 );
 
-		add_action( 'wp_print_footer_scripts', array($this,'inspect_stylescripts_footer'), 9.999999 ); //10 = Internal WordPress Output
-		
-		$this->mergecss = !get_option('mmr-nomergecss');
-		$this->mergejs = !get_option('mmr-nomergejs');
+			add_action( 'wp_print_footer_scripts', array($this,'inspect_stylescripts_footer'), 9.999999 ); //10 = Internal WordPress Output
     }
-    
-    register_deactivation_hook( __FILE__, array($this, 'plugin_deactivate') );
   }
   
   public function mmr_files_callback() {
@@ -91,9 +98,7 @@ class MergeMinifyRefresh {
 		  array_map('unlink', glob(WP_CONTENT_DIR.'/mmr/'.$_POST['purge'].'*'));
 	  }
 	  
-	  
 	  $return = array('js'=>array(),'css'=>array(),'stamp'=>$_POST['stamp']);
-	  
 
 	  $files = glob(WP_CONTENT_DIR.'/mmr/*.{js,css}', GLOB_BRACE);
 
@@ -193,6 +198,11 @@ class MergeMinifyRefresh {
   public function mmr_register_settings() {
 	  register_setting( 'mmr-group', 'mmr-nomergecss' );
 	  register_setting( 'mmr-group', 'mmr-nomergejs' );
+	  register_setting( 'mmr-group', 'mmr-nocssmin' );
+	  register_setting( 'mmr-group', 'mmr-nojsmin' );
+	  register_setting( 'mmr-group', 'mmr-http2push' );
+	  register_setting( 'mmr-group', 'mmr-outputbuffering' );
+	  register_setting( 'mmr-group', 'mmr-ignore' );
   }
   public function merge_minify_refresh_settings() {
 	  if ( !current_user_can( 'manage_options' ) )  {
@@ -206,15 +216,6 @@ class MergeMinifyRefresh {
 		echo '<div id="merge-minify-refresh"><h2>Merge + Minify + Refresh Settings</h2>';
 		
 		echo '<p>When a CSS or JS file is modified MMR will automatically re-process the files. However, when a dependancy changes these files may become stale.</p>';
-		
-		
-		
-		echo '<form method="post" id="mmr_options" action="options.php">';
-		settings_fields( 'mmr-group' ); 
-		do_settings_sections( 'mmr-group' ); 
-		echo '<label><input type="checkbox" name="mmr-nomergecss" value="1" '.checked( 1 == get_option('mmr-nomergecss') , true, false).'/> Don\'t Merge CSS</label> ';
-		echo '<label><input type="checkbox" name="mmr-nomergejs" value="1" '.checked( 1 == get_option('mmr-nomergejs') , true, false).'/> Don\'t Merge JS</label>';
-		echo '<button type="submit" class="button">SAVE</button><p>Note: Selecting these will increase requests but may be required for some themes. e.g. Themes using @import</p></form>';
 		
 		
 		echo '<div id="mmr_processed">
@@ -235,6 +236,37 @@ class MergeMinifyRefresh {
 					';
 
 		echo '</div>';
+		
+		
+		
+		echo '<form method="post" id="mmr_options" action="options.php">';
+		settings_fields( 'mmr-group' ); 
+		do_settings_sections( 'mmr-group' ); 
+		echo '<p><label><input type="checkbox" name="mmr-nomergecss" value="1" '.checked( 1 == get_option('mmr-nomergecss') , true, false).'/> Don\'t Merge CSS</label>';
+		echo '<label><input type="checkbox" name="mmr-nomergejs" value="1" '.checked( 1 == get_option('mmr-nomergejs') , true, false).'/> Don\'t Merge JS</label>';
+		echo '<br/><em>Note: Selecting these will increase requests but may be required for some themes. e.g. Themes using @import</em></p>';
+		
+		echo '<p><label><input type="checkbox" name="mmr-nocssmin" value="1" '.checked( 1 == get_option('mmr-nocssmin') , true, false).'/> Disable CSS Minification</label>';
+		
+		echo '<label><input type="checkbox" name="mmr-nojsmin" value="1" '.checked( 1 == get_option('mmr-nojsmin') , true, false).'/> Disable JS Minification</label>';
+		echo '<br/><em>Note: Disabling CSS/JS minification may require a "Purge All" to take effect.</em></p>';
+		
+		
+		echo '<p><label><input type="checkbox" name="mmr-http2push" value="1" '.checked( 1 == get_option('mmr-http2push') , true, false).'/> Enable HTTP2 Server Push</label>';
+		echo '<br/><em>Enables the server to send multiple responses (in parallel) for a single client request.</em></p>';
+		
+		
+		echo '<p><label><input type="checkbox" name="mmr-outputbuffering" value="1" '.checked( 1 == get_option('mmr-outputbuffering') , true, false).'/> Enable Output Buffering</label>';
+		
+		echo '<br/><em>Output buffering may be required for compatibility with some plugins. If its disabled only the header requests will be be sent for HTTP2 Server Push.</em></p>';
+		
+		echo '<p><label class="textlabel">Ignore these files (view logs to view paths):<textarea name="mmr-ignore" placeholder="/full/path/to/js/file.js or /full/path/to/css/file.css ">'.get_option('mmr-ignore').'</textarea></label></p>';
+		
+		
+		echo '<p><button type="submit" class="button">SAVE</button></p></form>';
+		
+		
+		
 		
   }
   
@@ -265,6 +297,10 @@ class MergeMinifyRefresh {
 		return preg_replace("/(http(s)?:\/\/|\/\/)(.*)/i", "http$2://$3", $url);
 	}
 
+	public function start_buffer() {
+			ob_start();
+	}
+
 	public function inspect_scripts() {
 
 		global $wp_scripts;
@@ -286,19 +322,19 @@ class MergeMinifyRefresh {
 	    	
 	    	if(!$is_footer) { //footer scripts get delt within the inspect_stylescripts_footer action
 		
-			    if( $this->host_match($wp_scripts->registered[$handle]->src)) { //is a local script
+			    if( $this->host_match($wp_scripts->registered[$handle]->src) && !in_array($wp_scripts->registered[$handle]->src, $this->ignore)) { //is a local script
 		
-					if(!$this->mergejs || isset($header[count($header)-1]['handle']) || count($header) == 0  ) {
-						array_push($header, array('modified'=>0,'handles'=>array()));
-				    }
+						if(!$this->mergejs || isset($header[count($header)-1]['handle']) || count($header) == 0  ) {
+							array_push($header, array('modified'=>0,'handles'=>array()));
+					    }
+							
+						$modified = 0;
 						
-					$modified = 0;
-					
-					if(is_file($this->root.$script_path['path'])) {
-						$modified = filemtime($this->root.$script_path['path']);
-					}
-		
-					array_push($header[count($header)-1]['handles'], $handle);
+						if(is_file($this->root.$script_path['path'])) {
+							$modified = filemtime($this->root.$script_path['path']);
+						}
+			
+						array_push($header[count($header)-1]['handles'], $handle);
 		
 				   	if($modified > $header[count($header)-1]['modified']) {
 					   	$header[count($header)-1]['modified'] = $modified;
@@ -323,7 +359,7 @@ class MergeMinifyRefresh {
 						
 						$done = array_merge($done, $header[$i]['handles']);
 	
-						$hash = md5(implode('',$header[$i]['handles']));					
+						$hash = hash('adler32',implode('',$header[$i]['handles']));					
 						
 						$file_path = '/mmr/'.$hash.'-'.$header[$i]['modified'].'.js';
 						
@@ -341,9 +377,17 @@ class MergeMinifyRefresh {
 							
 							foreach( $header[$i]['handles'] as $handle ) :
 							
-								$log .= " - ".$handle." - ".$wp_scripts->registered[$handle]->src."\n";
+								$log .= " - ".$handle." - ".$wp_scripts->registered[$handle]->src;
 			
 								$script_path = parse_url($this->ensure_scheme($wp_scripts->registered[$handle]->src));
+								
+								if(substr($script_path['path'], -7) == '.min.js') {
+									$nomin_path = substr($script_path['path'], 0, -7) . '.js';
+									if(is_file($this->root.$nomin_path)) {
+										$script_path['path'] = $nomin_path;
+										$log .= " - unminified version used";
+									}
+								}
 								
 								$contents = file_get_contents($this->root.$script_path['path']);
 	
@@ -351,6 +395,8 @@ class MergeMinifyRefresh {
 								$contents = preg_replace("/^\xEF\xBB\xBF/", '', $contents);
 								
 								$js .= $contents . ";\n";
+								
+								$log .= "\n";
 			
 							endforeach;
 	
@@ -362,7 +408,9 @@ class MergeMinifyRefresh {
 							file_put_contents($full_path.'.log', date('c')." - MERGED:\n".$log);
 	
 							wp_clear_scheduled_hook('compress_js', array($full_path) );
-							wp_schedule_single_event( time(), 'compress_js', array($full_path) );
+							if($this->jsmin) {
+								wp_schedule_single_event( time(), 'compress_js', array($full_path) );
+							}
 						} else {
 							file_put_contents($full_path.'.accessed', current_time('timestamp'));
 						}
@@ -376,8 +424,14 @@ class MergeMinifyRefresh {
 						endforeach;
 	
 						if($min_exists) {
+							if($this->http2push && !headers_sent()) {
+								header( 'Link: <'.WP_CONTENT_URL.$min_path.'>; rel=preload', false );
+							}
 							wp_register_script('header-'.$i, WP_CONTENT_URL.$min_path);
 						} else {
+							if($this->http2push && !headers_sent()) {
+								header( 'Link: <'.WP_CONTENT_URL.$file_path.'>; rel=preload', false );
+							}
 							wp_register_script('header-'.$i, WP_CONTENT_URL.$file_path);
 						}
 	
@@ -389,9 +443,7 @@ class MergeMinifyRefresh {
 						wp_enqueue_script('header-'.$i);
 					
 					} else { //external
-						
 						wp_enqueue_script($header[$i]['handle']);
-						
 					}
 			}
 
@@ -417,19 +469,19 @@ class MergeMinifyRefresh {
 	    
 	    	$script_path = parse_url($this->ensure_scheme($wp_scripts->registered[$handle]->src));
 
-		    if( $this->host_match($wp_scripts->registered[$handle]->src)) { //is a local script
+		    if( $this->host_match($wp_scripts->registered[$handle]->src) && !in_array($wp_scripts->registered[$handle]->src, $this->ignore)) { //is a local script
 	
-				if(!$this->mergejs || isset($footer[count($footer)-1]['handle']) || count($footer) == 0  ) {
-					array_push($footer, array('modified'=>0,'handles'=>array()));
-			    }
-					
-				$modified = 0;
-					
-				if(is_file($this->root.$script_path['path'])) {
-					$modified = filemtime($this->root.$script_path['path']);
-				}
-	
-				array_push($footer[count($footer)-1]['handles'], $handle);
+					if(!$this->mergejs || isset($footer[count($footer)-1]['handle']) || count($footer) == 0  ) {
+						array_push($footer, array('modified'=>0,'handles'=>array()));
+				    }
+						
+					$modified = 0;
+						
+					if(is_file($this->root.$script_path['path'])) {
+						$modified = filemtime($this->root.$script_path['path']);
+					}
+		
+					array_push($footer[count($footer)-1]['handles'], $handle);
 	
 			   	if($modified > $footer[count($footer)-1]['modified']) {
 				   	$footer[count($footer)-1]['modified'] = $modified;
@@ -452,7 +504,7 @@ class MergeMinifyRefresh {
 					
 					$done = array_merge($done, $footer[$i]['handles']);
 	
-					$hash = md5(implode('',$footer[$i]['handles']));
+					$hash = hash('adler32',implode('',$footer[$i]['handles']));
 					
 					$file_path = '/mmr/'.$hash.'-'.$footer[$i]['modified'].'.js';
 						
@@ -470,9 +522,17 @@ class MergeMinifyRefresh {
 						
 						foreach( $footer[$i]['handles'] as $handle ) :
 						
-							$log .= " - ".$handle." - ".$wp_scripts->registered[$handle]->src."\n";
+							$log .= " - ".$handle." - ".$wp_scripts->registered[$handle]->src;
 		
 							$script_path = parse_url($this->ensure_scheme($wp_scripts->registered[$handle]->src));
+							
+							if(substr($script_path['path'], -7) == '.min.js') {
+								$nomin_path = substr($script_path['path'], 0, -7) . '.js';
+								if(is_file($this->root.$nomin_path)) {
+									$script_path['path'] = $nomin_path;
+									$log .= " - unminified version used";
+								}
+							}
 							
 							$contents = file_get_contents($this->root.$script_path['path']);
 							
@@ -480,6 +540,8 @@ class MergeMinifyRefresh {
 							$contents = preg_replace("/^\xEF\xBB\xBF/", '', $contents);
 							
 							$js .= $contents . ";\n";
+							
+							$log .= "\n";
 		
 						endforeach;
 						
@@ -491,7 +553,9 @@ class MergeMinifyRefresh {
 						file_put_contents($full_path.'.log', date('c')." - MERGED:\n".$log);
 						
 						wp_clear_scheduled_hook('compress_js', array($full_path));
-						wp_schedule_single_event( time(), 'compress_js', array($full_path) );
+						if($this->jsmin) {
+							wp_schedule_single_event( time(), 'compress_js', array($full_path) );
+						}
 	
 					} else {
 						file_put_contents($full_path.'.accessed', current_time('timestamp'));
@@ -505,8 +569,14 @@ class MergeMinifyRefresh {
 					endforeach;
 					
 					if($min_exists) {
+						if($this->http2push && !headers_sent()) {
+							header( 'Link: <'.WP_CONTENT_URL.$min_path.'>; rel=preload', false );
+						}
 						wp_register_script('footer-'.$i, WP_CONTENT_URL.$min_path, false, false, true);
 					} else {
+						if($this->http2push && !headers_sent()) {
+							header( 'Link: <'.WP_CONTENT_URL.$file_path.'>; rel=preload', false );
+						}
 						wp_register_script('footer-'.$i, WP_CONTENT_URL.$file_path, false, false, true);
 					}
 					
@@ -543,7 +613,7 @@ class MergeMinifyRefresh {
 	    
 	    	$style_path = parse_url($this->ensure_scheme($wp_styles->registered[$handle]->src));
 	
-		    if( $this->host_match($wp_styles->registered[$handle]->src) ) { //is a local script
+		    if( $this->host_match($wp_styles->registered[$handle]->src) && !in_array($wp_styles->registered[$handle]->src, $this->ignore)) { //is a local script
 	
 				if(!$this->mergecss || isset($footer[count($footer)-1]['handle']) || count($footer) == 0 || $footer[count($footer)-1]['media'] != $wp_styles->registered[$handle]->args ) {
 					$media = isset($wp_styles->registered[$handle]->args) ? $wp_styles->registered[$handle]->args : 'all';
@@ -580,7 +650,7 @@ class MergeMinifyRefresh {
 						
 						$done = array_merge($done, $footer[$i]['handles']);
 						
-						$hash = md5(implode('',$footer[$i]['handles']));
+						$hash = hash('adler32',implode('',$footer[$i]['handles']));
 	
 						$file_path = '/mmr/'.$hash.'-'.$footer[$i]['modified'].'.css';
 	
@@ -600,7 +670,15 @@ class MergeMinifyRefresh {
 	
 								$style_path = parse_url($this->ensure_scheme($wp_styles->registered[$handle]->src));
 								
-								$log .= " - ".$handle." - ".$wp_styles->registered[$handle]->src."\n";
+								$log .= " - ".$handle." - ".$wp_styles->registered[$handle]->src;
+								
+								if(substr($style_path['path'], -8) == '.min.css') {
+									$nomin_path = substr($style_path['path'], 0, -8) . '.css';
+									if(is_file($this->root.$nomin_path)) {
+										$style_path['path'] = $nomin_path;
+										$log .= " - unminified version used";
+									}
+								}
 								
 								$css_contents = file_get_contents($this->root.$style_path['path']);
 								
@@ -611,6 +689,8 @@ class MergeMinifyRefresh {
 								$css_contents =preg_replace("/url\(\s*['\"]?(?!data:)(?!http)(?![\/'\"])(.+?)['\"]?\s*\)/i", "url(".dirname($style_path['path'])."/$1)", $css_contents);
 	
 								$css .= $css_contents . "\n";
+								
+								$log .= "\n";
 			
 							endforeach;
 							
@@ -622,14 +702,22 @@ class MergeMinifyRefresh {
 							file_put_contents($full_path.'.log', date('c')." - MERGED:\n".$log);
 								
 							wp_clear_scheduled_hook('compress_css', array($full_path) );
-							wp_schedule_single_event( time(), 'compress_css', array($full_path) );
+							if($this->cssmin) {
+								wp_schedule_single_event( time(), 'compress_css', array($full_path) );
+							}
 						} else {
 							file_put_contents($full_path.'.accessed', current_time('timestamp'));
 						}
 						
 						if($min_exists) {
+							if($this->http2push && !headers_sent()) {
+								header( 'Link: <'.WP_CONTENT_URL.$min_path.'>; rel=preload', false );
+							}
 							wp_register_style('footer-'.$i, WP_CONTENT_URL.$min_path,false,false,$footer[$i]['media']);
 						} else {
+							if($this->http2push && !headers_sent()) {
+								header( 'Link: <'.WP_CONTENT_URL.$file_path.'>; rel=preload', false );
+							}
 							wp_register_style('footer-'.$i, WP_CONTENT_URL.$file_path,false,false,$footer[$i]['media']);
 						}
 						
@@ -645,6 +733,10 @@ class MergeMinifyRefresh {
 			
 			$wp_styles->done = $done;
 			
+		}
+		
+		if($this->outputbuffering) {
+			ob_end_flush();
 		}
 
   }
@@ -666,7 +758,7 @@ class MergeMinifyRefresh {
 	    
 	    	$style_path = parse_url($this->ensure_scheme($wp_styles->registered[$handle]->src));
 	
-		    if( $this->host_match($wp_styles->registered[$handle]->src) ) { //is a local script
+		    if( $this->host_match($wp_styles->registered[$handle]->src) && !in_array($wp_styles->registered[$handle]->src, $this->ignore) ) { //is a local script
 	
 				if(!$this->mergecss || isset($header[count($header)-1]['handle']) || count($header) == 0 || $header[count($header)-1]['media'] != $wp_styles->registered[$handle]->args ) {
 					$media = isset($wp_styles->registered[$handle]->args) ? $wp_styles->registered[$handle]->args : 'all';
@@ -700,7 +792,7 @@ class MergeMinifyRefresh {
 						
 						$done = array_merge($done, $header[$i]['handles']);
 						
-						$hash = md5(implode('',$header[$i]['handles']));
+						$hash = hash('adler32',implode('',$header[$i]['handles']));
 	
 						$file_path = '/mmr/'.$hash.'-'.$header[$i]['modified'].'.css';
 	
@@ -720,7 +812,15 @@ class MergeMinifyRefresh {
 	
 								$style_path = parse_url($this->ensure_scheme($wp_styles->registered[$handle]->src));
 								
-								$log .= " - ".$handle." - ".$wp_styles->registered[$handle]->src."\n";
+								$log .= " - ".$handle." - ".$wp_styles->registered[$handle]->src;
+								
+								if(substr($style_path['path'], -8) == '.min.css') {
+									$nomin_path = substr($style_path['path'], 0, -8) . '.css';
+									if(is_file($this->root.$nomin_path)) {
+										$style_path['path'] = $nomin_path;
+										$log .= " - unminified version used";
+									}
+								}
 								
 								$css_contents = file_get_contents($this->root.$style_path['path']);
 								
@@ -731,6 +831,8 @@ class MergeMinifyRefresh {
 								$css_contents =preg_replace("/url\(\s*['\"]?(?!data:)(?!http)(?![\/'\"])(.+?)['\"]?\s*\)/i", "url(".dirname($style_path['path'])."/$1)", $css_contents);
 	
 								$css .= $css_contents . "\n";
+								
+								$log .= "\n";
 			
 							endforeach;
 							
@@ -740,16 +842,24 @@ class MergeMinifyRefresh {
 							file_put_contents($full_path , $css);
 							
 							file_put_contents($full_path.'.log', date('c')." - MERGED:\n".$log);
-								
+							
 							wp_clear_scheduled_hook('compress_css', array($full_path) );
-							wp_schedule_single_event( time(), 'compress_css', array($full_path) );
+							if($this->cssmin) {
+								wp_schedule_single_event( time(), 'compress_css', array($full_path) );
+							}
 						} else {
 							file_put_contents($full_path.'.accessed', current_time('timestamp'));
 						}
 						
 						if($min_exists) {
+							if($this->http2push && !headers_sent()) {
+								header( 'Link: <'.WP_CONTENT_URL.$min_path.'>; rel=preload', false );
+							}
 							wp_register_style('header-'.$i, WP_CONTENT_URL.$min_path,false,false,$header[$i]['media']);
 						} else {
+							if($this->http2push && !headers_sent()) {
+								header( 'Link: <'.WP_CONTENT_URL.$file_path.'>; rel=preload', false );
+							}
 							wp_register_style('header-'.$i, WP_CONTENT_URL.$file_path,false,false,$header[$i]['media']);
 						}
 						
@@ -772,7 +882,13 @@ class MergeMinifyRefresh {
 	public function compress_css_action($full_path) {
 	
 		if(is_file($full_path)) {
-	
+			
+			require_once('Minify/Minify.php');
+			require_once('Minify/CSS.php');
+			require_once('Minify/Converter.php');
+			require_once('Minify/Exception.php');
+			require_once('Minify/JS.php');
+				
 			file_put_contents($full_path.'.log', date('c')." - COMPRESSING CSS\n",FILE_APPEND);
 
 			$file_size_before = filesize($full_path);
@@ -828,6 +944,12 @@ class MergeMinifyRefresh {
 					unlink($full_path.'.tmp');
 				}
 			} else {
+				
+				require_once('Minify/Minify.php');
+				require_once('Minify/CSS.php');
+				require_once('Minify/Converter.php');
+				require_once('Minify/Exception.php');
+				require_once('Minify/JS.php');
 				
 				file_put_contents($full_path.'.log', date('c')." - COMPRESSING WITH MINIFY (PHP exec not available)\n",FILE_APPEND);
 				

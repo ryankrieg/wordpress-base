@@ -1,0 +1,5 @@
+2016-02-06T05:49:29+00:00 - MERGED:
+ - mfn-custom - http://localhost:8888/wp-content/themes/betheme/css/custom.css
+ - style - http://localhost:8888/wp-content/themes/betheme-child/style.css
+2016-02-06T05:49:31+00:00 - COMPRESSING CSS
+2016-02-06T05:49:31+00:00 - COMPRESSION COMPLETE - 416.00B saved

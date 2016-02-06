@@ -208,7 +208,7 @@ class CSS extends Minify
 
             // only replace the import with the content if we can grab the
             // content of the file
-            if (file_exists($importPath) && is_file($importPath)) {
+            if (strlen($importPath) < PHP_MAXPATHLEN && file_exists($importPath) && is_file($importPath)) {
                 // grab referenced file & minify it (which may include importing
                 // yet other @import statements recursively)
                 $minifier = new static($importPath);
@@ -259,7 +259,8 @@ class CSS extends Minify
 
                 // only replace the import with the content if we're able to get
                 // the content of the file, and it's relatively small
-                $import = file_exists($path);
+                $import = strlen($path) < PHP_MAXPATHLEN;
+                $import = $import && file_exists($path);
                 $import = $import && is_file($path);
                 $import = $import && filesize($path) <= $this->maxImportSize * 1024;
                 if (!$import) {
@@ -314,6 +315,10 @@ class CSS extends Minify
             // restore the string we've extracted earlier
             $css = $this->restoreExtractedData($css);
 
+            $source = $source ?: '';
+            $css = $this->combineImports($source, $css);
+            $css = $this->importFiles($source, $css);
+
             /*
              * If we'll save to a new path, we'll have to fix the relative paths
              * to be relative no longer to the source file, but to the new path.
@@ -321,14 +326,8 @@ class CSS extends Minify
              * conversion happens (because we still want it to go through most
              * of the move code...)
              */
-            $source = $source ?: '';
             $converter = new Converter($source, $path ?: $source);
             $css = $this->move($converter, $css);
-
-            // if no target path is given, relative paths were not converted, so
-            // they'll still be relative to the source file then
-            $css = $this->importFiles($path ?: $source, $css);
-            $css = $this->combineImports($path ?: $source, $css);
 
             // combine css
             $content .= $css;
@@ -445,8 +444,15 @@ class CSS extends Minify
             // determine if it's a url() or an @import match
             $type = (strpos($match[0], '@import') === 0 ? 'import' : 'url');
 
+            // attempting to interpret GET-params makes no sense, so let's discard them for awhile
+            $params = strrchr($match['path'], '?');
+            $url = $params ? substr($match['path'], 0, -strlen($params)) : $match['path'];
+
             // fix relative url
-            $url = $converter->convert($match['path']);
+            $url = $converter->convert($url);
+
+            // now that the path has been converted, re-apply GET-params
+            $url .= $params;
 
             // build replacement
             $search[] = $match[0];
@@ -522,11 +528,12 @@ class CSS extends Minify
      * Strip comments from source code.
      *
      * @param string $content
+     *
      * @return string
      */
     protected function stripEmptyTags($content)
     {
-        return preg_replace('/(^|\})[^\{]+\{\s*\}/', '\\1', $content);
+        return preg_replace('/(^|\})[^\{\}]+\{\s*\}/', '\\1', $content);
     }
 
     /**

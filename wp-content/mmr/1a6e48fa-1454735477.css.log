@@ -1,0 +1,18 @@
+2016-02-06T05:49:29+00:00 - MERGED:
+ - contact-form-7 - http://localhost:8888/wp-content/plugins/contact-form-7/includes/css/styles.css
+ - rs-plugin-settings - http://localhost:8888/wp-content/plugins/revslider/public/assets/css/settings.css
+ - mfn-base - http://localhost:8888/wp-content/themes/betheme/css/base.css
+ - mfn-btn - http://localhost:8888/wp-content/themes/betheme/css/buttons.css
+ - mfn-icons - http://localhost:8888/wp-content/themes/betheme/fonts/mfn-icons.css
+ - mfn-grid - http://localhost:8888/wp-content/themes/betheme/css/grid.css
+ - mfn-layout - http://localhost:8888/wp-content/themes/betheme/css/layout.css
+ - mfn-shortcodes - http://localhost:8888/wp-content/themes/betheme/css/shortcodes.css
+ - mfn-variables - http://localhost:8888/wp-content/themes/betheme/css/variables.css
+ - mfn-style-simple - http://localhost:8888/wp-content/themes/betheme/css/style-simple.css
+ - mfn-animations - http://localhost:8888/wp-content/themes/betheme/assets/animations/animations.min.css - unminified version used
+ - mfn-jquery-ui - http://localhost:8888/wp-content/themes/betheme/assets/ui/jquery.ui.all.css
+ - mfn-prettyPhoto - http://localhost:8888/wp-content/themes/betheme/assets/prettyPhoto/prettyPhoto.css
+ - mfn-jplayer - http://localhost:8888/wp-content/themes/betheme/assets/jplayer/css/jplayer.blue.monday.css
+ - mfn-responsive - http://localhost:8888/wp-content/themes/betheme/css/responsive.css
+2016-02-06T05:49:30+00:00 - COMPRESSING CSS
+2016-02-06T05:49:31+00:00 - COMPRESSION COMPLETE - 97.12K saved

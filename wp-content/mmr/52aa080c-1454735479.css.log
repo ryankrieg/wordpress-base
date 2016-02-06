@@ -1,0 +1,5 @@
+2016-02-06T05:49:29+00:00 - MERGED:
+ - admin-bar - /wp-includes/css/admin-bar.min.css - unminified version used
+ - layerslider - http://localhost:8888/wp-content/plugins/LayerSlider/static/css/layerslider.css
+2016-02-06T05:49:30+00:00 - COMPRESSING CSS
+2016-02-06T05:49:30+00:00 - COMPRESSION COMPLETE - 7.19K saved

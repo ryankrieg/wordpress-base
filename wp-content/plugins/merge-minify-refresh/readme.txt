@@ -20,6 +20,8 @@ Minification by [Minify](https://github.com/matthiasmullie/minify) and [Google C
 
 In order to ensure fast loading times its recommended to set long expiry dates for CSS and JS as well as make sure gzip or deflate is on.
 
+Version 1.6 adds support for HTTP2 Server Push to further speed up your requests (thanks to [Daniel Aleksandersen](https://www.slightfuture.com)).
+
 **Note** Installing this plugin on a server with the eAccellerator module installed has the potential to break as Minify uses anonymous functions which return NULL. [View eAccellerator Issue Thread](https://github.com/eaccelerator/eaccelerator/issues/12)
 
 **Features**
@@ -34,6 +36,11 @@ In order to ensure fast loading times its recommended to set long expiry dates f
 *	Stores Assets in /wp-content/mmr/ folder
 *	Uses last modified date in filename so any changes to JS or CSS automatically get re-processed and downloaded on browser refresh
 *	View status of merge and minify on settings page in WordPress admin
+*	Option to enable http2 server push (thanks to [Daniel Aleksandersen](https://www.slightfuture.com))
+*	Option to enable output buffering for compatability and so footer scripts can be HTTP2 pushed
+*	Ability to turn off minification
+*	Ability to turn off concatination
+*	Ability to manually ignore scripts or css
 
 == Installation ==
 
@@ -41,6 +48,22 @@ In order to ensure fast loading times its recommended to set long expiry dates f
 2. Activate the plugin through the 'Plugins' menu in WordPress
 
 == Changelog ==
+
+= 1.6.2 =
+* Upgraded Minify to latest version
+* Upgraded Closure to latest version
+
+= 1.6.1 =
+* MMR looks for non minified scripts and styles by default (eg. script.min.js = script.js). If found it will use them. This improves compatibility and can fix minification errors.
+
+= 1.6 =
+* Option to enable http2 server push (thanks to Daniel Aleksandersen - https://www.slightfuture.com)
+* Option to enable output buffering for compatability and so footer scripts can be HTTP2 pushed
+* Ability to turn off minification
+* Ability to turn off concatination
+* Reduced plugin memory usage by only including Minify when required
+* Ability to manually ignore scripts or css
+* Changed hashes from md5 to adler32 as it is faster
 
 = 1.5.2 =
 * Upgrade Minify to latest version

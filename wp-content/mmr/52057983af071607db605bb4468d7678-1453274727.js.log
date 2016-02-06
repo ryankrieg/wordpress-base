@@ -1,0 +1,10 @@
+2016-02-06T05:00:41+00:00 - MERGED:
+ - twentysixteen-html5 - http://localhost:8888/wp-content/themes/twentysixteen/js/html5.js
+ - jquery-core - /wp-includes/js/jquery/jquery.js
+ - jquery-migrate - /wp-includes/js/jquery/jquery-migrate.min.js
+2016-02-06T05:01:48+00:00 - COMPRESSING JS WITH CLOSURE
+2016-02-06T05:01:48+00:00 - COMPRESSION FAILED
+array(1) {
+  [0]=>
+  string(44) "No Java runtime present, requesting install."
+}
