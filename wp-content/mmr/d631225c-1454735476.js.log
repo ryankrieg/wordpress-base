@@ -1,0 +1,12 @@
+2016-02-16T21:31:04+00:00 - MERGED:
+ - jquery-form - http://localhost:8888/wp-content/plugins/contact-form-7/includes/js/jquery.form.min.js - unminified version used
+ - contact-form-7 - http://localhost:8888/wp-content/plugins/contact-form-7/includes/js/scripts.js
+ - twentysixteen-skip-link-focus-fix - http://localhost:8888/wp-content/themes/twentysixteen/js/skip-link-focus-fix.js
+ - twentysixteen-script - http://localhost:8888/wp-content/themes/twentysixteen/js/functions.js
+ - wp-embed - /wp-includes/js/wp-embed.min.js - unminified version used
+2016-02-16T21:31:08+00:00 - COMPRESSING JS WITH CLOSURE
+2016-02-16T21:31:09+00:00 - COMPRESSION FAILED
+array(1) {
+  [0]=>
+  string(44) "No Java runtime present, requesting install."
+}

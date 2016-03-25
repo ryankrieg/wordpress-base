@@ -1,0 +1,8 @@
+2016-02-16T21:31:04+00:00 - MERGED:
+ - genericons - http://localhost:8888/wp-content/plugins/jetpack/_inc/genericons/genericons/genericons.css
+ - twentysixteen-style - http://localhost:8888/wp-content/themes/twentysixteen/style.css
+ - twentysixteen-ie - http://localhost:8888/wp-content/themes/twentysixteen/css/ie.css
+ - twentysixteen-ie8 - http://localhost:8888/wp-content/themes/twentysixteen/css/ie8.css
+ - twentysixteen-ie7 - http://localhost:8888/wp-content/themes/twentysixteen/css/ie7.css
+2016-02-16T21:31:08+00:00 - COMPRESSING CSS
+2016-02-16T21:31:08+00:00 - COMPRESSION COMPLETE - 16.12K saved

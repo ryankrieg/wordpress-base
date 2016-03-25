@@ -1,0 +1,20 @@
+2016-02-16T19:24:17+00:00 - MERGED:
+ - jquery-ui-mouse - /wp-includes/js/jquery/ui/mouse.min.js
+ - jquery-ui-resizable - /wp-includes/js/jquery/ui/resizable.min.js
+ - jquery-ui-draggable - /wp-includes/js/jquery/ui/draggable.min.js
+ - jquery-ui-button - /wp-includes/js/jquery/ui/button.min.js
+ - jquery-ui-position - /wp-includes/js/jquery/ui/position.min.js
+ - jquery-ui-dialog - /wp-includes/js/jquery/ui/dialog.min.js
+ - wpdialogs - /wp-includes/js/wpdialog.min.js - unminified version used
+ - greensock - http://localhost:8888/wp-content/plugins/LayerSlider/static/js/greensock.js
+ - layerslider - http://localhost:8888/wp-content/plugins/LayerSlider/static/js/layerslider.kreaturamedia.jquery.js
+ - layerslider-transitions - http://localhost:8888/wp-content/plugins/LayerSlider/static/js/layerslider.transitions.js
+ - tp-tools - http://localhost:8888/wp-content/plugins/revslider/public/assets/js/jquery.themepunch.tools.min.js
+ - revmin - http://localhost:8888/wp-content/plugins/revslider/public/assets/js/jquery.themepunch.revolution.min.js
+ - jquery-ui-sortable - /wp-includes/js/jquery/ui/sortable.min.js
+2016-02-16T19:26:01+00:00 - COMPRESSING JS WITH CLOSURE
+2016-02-16T19:26:01+00:00 - COMPRESSION FAILED
+array(1) {
+  [0]=>
+  string(44) "No Java runtime present, requesting install."
+}

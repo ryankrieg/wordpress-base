@@ -1,0 +1,5 @@
+2016-02-16T21:31:04+00:00 - MERGED:
+ - wp-jquery-ui-dialog - /wp-includes/css/jquery-ui-dialog.min.css - unminified version used
+ - twentysixteen-jetpack - http://localhost:8888/wp-content/plugins/jetpack/modules/theme-tools/compat/twentysixteen.css
+2016-02-16T21:31:08+00:00 - COMPRESSING CSS
+2016-02-16T21:31:08+00:00 - COMPRESSION COMPLETE - 4.09K saved
